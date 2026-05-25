@@ -13,7 +13,7 @@ st.set_page_config(page_title="Eğirdir Gölü KDS", page_icon="🌊", layout="w
 def load_data():
     dosya_yolu = "Tez_Veriler_5_Scenarios_with_99CI.csv"
     if os.path.exists(dosya_yolu):
-        df = pd.read_csv(dosya_yolu)
+        df = pd.read_csv(dosya_yolu, sep=None, engine='python')
         df['Date'] = pd.to_datetime(df['Date'])
         df['Year'] = df['Date'].dt.year
         return df
