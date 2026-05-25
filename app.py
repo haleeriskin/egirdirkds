@@ -40,7 +40,7 @@ if df is not None:
     secilen_senaryo_adi = st.sidebar.selectbox("🌡️ İklim Senaryosunu Seçiniz:", list(scenario_dict.keys()))
     secilen_sutun = scenario_dict[secilen_senaryo_adi]
     
-    hedef_yil = st.sidebar.slider("📅 Hedef Yılı Seçiniz:", min_value=2026, max_value=2100, value=2050, step=1)
+    hedef_yil = st.sidebar.slider("📅 Hedef Yılı Seçiniz:", min_value=2026, max_value=2050, value=2050, step=1)
     
     st.sidebar.markdown("---")
     st.sidebar.info("📌 **Bilgi:** Bu sistem, Random Forest makine öğrenmesi algoritması ve IPCC AR6 / MedECC MAR1 iklim standartları kullanılarak geliştirilmiştir.")
