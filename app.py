@@ -25,7 +25,7 @@ df = load_data()
 
 if df is not None:
     # 3. YAN MENÜ (SIDEBAR) TASARIMI
-    st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Egirdir_Lake.jpg/800px-Egirdir_Lake.jpg", use_column_width=True)
+    st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/0/0b/Yedi_Renkli_G%C3%B6l_%E2%80%93_E%C4%9Firdir.jpg", use_column_width=True)
     st.sidebar.title("KONTROL PANELİ")
     st.sidebar.markdown("---")
     
