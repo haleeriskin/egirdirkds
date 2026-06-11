@@ -5,56 +5,31 @@ import folium
 from streamlit_folium import st_folium
 import os
 
-# ============================================================
 # 1. SAYFA AYARLARI
-# ============================================================
+st.set_page_config(page_title="Eğirdir Gölü KDS", page_icon="🌊", layout="wide")
 
-st.set_page_config(
-    page_title="Eğirdir Gölü KDS",
-    page_icon="🌊",
-    layout="wide"
-)
-
-# ============================================================
 # 2. SABİT EŞİK DEĞERLERİ
-# ============================================================
-
 KRITIK_ESIK = 2150  # hm³
 UYARI_ESIK = 2400   # hm³
 
-# ============================================================
 # 3. VERİ YÜKLEME
-# ============================================================
-
 @st.cache_data
 def load_data():
     dosya_yolu = "Tez_Veriler_5_Scenarios_with_99CI.csv"
-
     if os.path.exists(dosya_yolu):
-        df = pd.read_csv(dosya_yolu, sep=None, engine="python")
-        df["Date"] = pd.to_datetime(df["Date"])
-        df["Year"] = df["Date"].dt.year
+        df = pd.read_csv(dosya_yolu, sep=None, engine='python')
+        df['Date'] = pd.to_datetime(df['Date'])
+        df['Year'] = df['Date'].dt.year
         return df
     else:
-        st.error(
-            f"⚠️ {dosya_yolu} bulunamadı! "
-            "Lütfen CSV dosyasının KDS ile aynı klasörde olduğundan emin olun."
-        )
+        st.error(f"⚠️ {dosya_yolu} bulunamadı! Lütfen KDS ile aynı klasörde olduğundan emin olun.")
         return None
-
 
 df = load_data()
 
-# ============================================================
-# 4. ANA UYGULAMA
-# ============================================================
-
 if df is not None:
 
-    # ------------------------------------------------------------
-    # 4.1. YAN MENÜ
-    # ------------------------------------------------------------
-
+    # 4. YAN MENÜ TASARIMI
     st.sidebar.image(
         "https://upload.wikimedia.org/wikipedia/commons/0/0b/Yedi_Renkli_G%C3%B6l_%E2%80%93_E%C4%9Firdir.jpg",
         use_container_width=True
@@ -63,6 +38,7 @@ if df is not None:
     st.sidebar.title("KONTROL PANELİ")
     st.sidebar.markdown("---")
 
+    # Senaryo Sözlüğü
     scenario_dict = {
         "Baseline (Geçmiş İklim Eğilimi)": "Volume_Cumulative_base",
         "CanESM5 SSP1-2.6 (İyimser)": "Volume_Cumulative_SSP1_26",
@@ -79,7 +55,7 @@ if df is not None:
 
     hedef_yil = st.sidebar.slider(
         "📅 Hedef Yılı Seçiniz:",
-        min_value=2021,
+        min_value=2026,
         max_value=2050,
         value=2050,
         step=1
@@ -92,108 +68,71 @@ if df is not None:
         "ve IPCC AR6 / MedECC MAR1 iklim standartları kullanılarak geliştirilmiştir."
     )
 
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### Eşik Değerleri")
-    st.sidebar.markdown(f"🚨 **Kritik Eşik:** {KRITIK_ESIK:,.0f} hm³")
-    st.sidebar.markdown(f"⚠️ **Uyarı Eşiği:** {UYARI_ESIK:,.0f} hm³")
-
-    # ------------------------------------------------------------
-    # 4.2. ANA BAŞLIK
-    # ------------------------------------------------------------
-
+    # 5. ANA EKRAN TASARIMI
     st.title("🌊 Eğirdir Gölü Su Kaynakları Karar Destek Sistemi (KDS)")
+    st.markdown(f"**Seçilen Yıl:** {hedef_yil} | **Aktif Senaryo:** {secilen_senaryo_adi}")
 
-    st.markdown(
-        f"**Seçilen Yıl:** {hedef_yil} | "
-        f"**Aktif Senaryo:** {secilen_senaryo_adi}"
-    )
-
-    # ------------------------------------------------------------
-    # 4.3. SEÇİLEN YIL VERİSİ
-    # ------------------------------------------------------------
-
-    df_yil = df[df["Year"] == hedef_yil]
+    # Seçilen yıla ait veri
+    df_yil = df[df['Year'] == hedef_yil]
 
     if not df_yil.empty:
 
+        # O yılın son ayındaki kümülatif durumu al
         son_deger = df_yil.iloc[-1]
 
         tahmin_hacim = son_deger[secilen_sutun]
-        alt_sinir = son_deger["Volume_Cumulative_Lower_99CI"]
-        ust_sinir = son_deger["Volume_Cumulative_Upper_99CI"]
+        alt_sinir = son_deger['Volume_Cumulative_Lower_99CI']
+        ust_sinir = son_deger['Volume_Cumulative_Upper_99CI']
 
-        # ------------------------------------------------------------
-        # 4.4. RİSK DURUMU ANALİZİ
-        # ------------------------------------------------------------
+        # 6. RİSK DURUMU ANALİZİ
+        # Artık güven aralığına göre değil, sabit eşiklere göre çalışır.
 
         if tahmin_hacim < KRITIK_ESIK:
-            durum_mesaji = (
-                "🚨 KRİTİK SEVİYE: Tahmini hacim 2150 hm³ kritik eşiğinin altına düşmüştür."
-            )
-            durum_kisa = "KRİTİK"
-            sayfa_rengi = "#ffebee"      # açık kırmızı
-            kutu_rengi = "#b71c1c"       # koyu kırmızı
-            metin_rengi = "white"
+            durum_mesaji = "🚨 KRİTİK SEVİYE"
+            durum_aciklama = "Tahmini hacim 2150 hm³ kritik eşiğinin altına düşmüştür."
+            renk = "inverse"
+            arka_plan_rengi = "#ffebee"   # açık kırmızı
+            uyari_kutu_rengi = "#ffcdd2"
 
         elif tahmin_hacim < UYARI_ESIK:
-            durum_mesaji = (
-                "⚠️ UYARI SEVİYESİ: Tahmini hacim 2400 hm³ uyarı eşiğinin altına düşmüştür."
-            )
-            durum_kisa = "UYARI"
-            sayfa_rengi = "#fff8e1"      # açık sarı
-            kutu_rengi = "#f57f17"       # koyu sarı/turuncu
-            metin_rengi = "white"
+            durum_mesaji = "⚠️ UYARI SEVİYESİ"
+            durum_aciklama = "Tahmini hacim 2400 hm³ uyarı eşiğinin altına düşmüştür."
+            renk = "off"
+            arka_plan_rengi = "#fff8e1"   # açık sarı
+            uyari_kutu_rengi = "#ffecb3"
 
         else:
-            durum_mesaji = (
-                "✅ NORMAL SEVİYE: Tahmini hacim operasyonel eşik değerlerinin üzerindedir."
-            )
-            durum_kisa = "NORMAL"
-            sayfa_rengi = "#ffffff"      # beyaz
-            kutu_rengi = "#1b5e20"       # koyu yeşil
-            metin_rengi = "white"
+            durum_mesaji = "✅ NORMAL SEVİYE"
+            durum_aciklama = "Tahmini hacim uyarı ve kritik eşik değerlerinin üzerindedir."
+            renk = "normal"
+            arka_plan_rengi = "#ffffff"   # normal beyaz
+            uyari_kutu_rengi = "#e8f5e9"
 
-        # ------------------------------------------------------------
-        # 4.5. SAYFA RENK STİLİ
-        # ------------------------------------------------------------
-
+        # 7. SAYFA ARKA PLAN RENGİ
         st.markdown(
             f"""
             <style>
             .stApp {{
-                background-color: {sayfa_rengi};
+                background-color: {arka_plan_rengi};
             }}
 
-            .risk-box {{
-                padding: 18px;
-                border-radius: 12px;
-                background-color: {kutu_rengi};
-                color: {metin_rengi};
-                font-size: 20px;
-                font-weight: bold;
-                text-align: center;
-                margin-top: 15px;
-                margin-bottom: 20px;
-                box-shadow: 0px 2px 8px rgba(0,0,0,0.15);
-            }}
-
-            .threshold-info {{
-                padding: 12px;
+            .uyari-kutusu {{
+                background-color: {uyari_kutu_rengi};
+                padding: 14px;
                 border-radius: 10px;
-                background-color: rgba(255,255,255,0.80);
-                border: 1px solid #dddddd;
+                margin-top: 10px;
                 margin-bottom: 15px;
+                font-size: 17px;
+                font-weight: 600;
+                border: 1px solid rgba(0,0,0,0.12);
             }}
             </style>
             """,
             unsafe_allow_html=True
         )
 
-        # ------------------------------------------------------------
-        # 4.6. ÜST SKOR KARTLARI
-        # ------------------------------------------------------------
-
-        col1, col2, col3, col4 = st.columns(4)
+        # 8. ÜST SKOR KARTLARI
+        col1, col2, col3 = st.columns(3)
 
         col1.metric(
             label="Tahmini Rezervuar Hacmi",
@@ -201,32 +140,23 @@ if df is not None:
         )
 
         col2.metric(
-            label="Kritik Eşik",
+            label="Kritik Eşik Değeri",
             value=f"{KRITIK_ESIK:,.0f} hm³"
         )
 
         col3.metric(
-            label="Uyarı Eşiği",
-            value=f"{UYARI_ESIK:,.0f} hm³"
-        )
-
-        col4.metric(
             label="Sistem Durumu",
-            value=durum_kisa
-        )
-
-        st.markdown(
-            f"<div class='risk-box'>{durum_mesaji}</div>",
-            unsafe_allow_html=True
+            value=durum_mesaji,
+            delta_color=renk
         )
 
         st.markdown(
             f"""
-            <div class='threshold-info'>
-            <b>Karar Mantığı:</b>
-            Hacim <b>{KRITIK_ESIK:,.0f} hm³</b> altına düşerse <b>kritik seviye</b>,
-            <b>{KRITIK_ESIK:,.0f}–{UYARI_ESIK:,.0f} hm³</b> aralığında ise <b>uyarı seviyesi</b>,
-            <b>{UYARI_ESIK:,.0f} hm³</b> üzerinde ise <b>normal seviye</b> olarak değerlendirilir.
+            <div class="uyari-kutusu">
+            {durum_aciklama}<br>
+            <b>Karar Mantığı:</b> 
+            2150 hm³ altı kritik seviye, 2150–2400 hm³ arası uyarı seviyesi, 
+            2400 hm³ üzeri normal seviye olarak değerlendirilir.
             </div>
             """,
             unsafe_allow_html=True
@@ -234,52 +164,43 @@ if df is not None:
 
         st.markdown("---")
 
-        # ------------------------------------------------------------
-        # 4.7. GRAFİK VE HARİTA
-        # ------------------------------------------------------------
-
+        # 9. ALT BÖLÜM: GRAFİK VE HARİTA
         col_grafik, col_harita = st.columns((2, 1))
 
         with col_grafik:
+            st.subheader(f"Gelecek Projeksiyonu (2020 - {hedef_yil})")
 
-            st.subheader(f"Gelecek Projeksiyonu: 2020 - {hedef_yil}")
+            # Seçilen yıla kadar olan tüm ayları alır.
+            # Eğer CSV aylık ise grafik aylık değerleri gösterir.
+            df_plot = df[df['Year'] <= hedef_yil].copy()
 
-            df_plot = df[df["Year"] <= hedef_yil]
-
+            # Plotly ile etkileşimli ve yumuşatılmış çizgi grafik
             fig = px.line(
                 df_plot,
-                x="Date",
+                x='Date',
                 y=secilen_sutun,
                 title=f"{secilen_senaryo_adi} Hacim Eğrisi",
                 labels={
-                    "Date": "Tarih",
-                    secilen_sutun: "Kümülatif Hacim (hm³)"
-                }
+                    'Date': 'Tarih',
+                    secilen_sutun: 'Kümülatif Hacim (hm³)'
+                },
+                line_shape="spline"
             )
 
-            # Seçilen senaryo çizgisi
             fig.update_traces(
                 name="Tahmini Hacim",
                 showlegend=True,
                 line=dict(width=3)
             )
 
-            # %99 alt güven sınırı
+            # %99 Alt Sınır
             fig.add_scatter(
-                x=df_plot["Date"],
-                y=df_plot["Volume_Cumulative_Lower_99CI"],
-                mode="lines",
-                name="%99 Alt Sınır",
-                line=dict(dash="dot", color="red", width=2)
-            )
-
-            # %99 üst güven sınırı
-            fig.add_scatter(
-                x=df_plot["Date"],
-                y=df_plot["Volume_Cumulative_Upper_99CI"],
-                mode="lines",
-                name="%99 Üst Sınır",
-                line=dict(dash="dot", color="green", width=2)
+                x=df_plot['Date'],
+                y=df_plot['Volume_Cumulative_Lower_99CI'],
+                mode='lines',
+                name='%99 Alt Sınır',
+                line=dict(dash='dot', color='red'),
+                line_shape="spline"
             )
 
             # Kritik eşik çizgisi: 2150 hm³
@@ -293,17 +214,15 @@ if df is not None:
             )
 
             fig.update_layout(
-                xaxis_title="Tarih",
-                yaxis_title="Kümülatif Hacim (hm³)",
                 hovermode="x unified",
                 legend_title_text="Gösterge",
-                height=500
+                yaxis_title="Kümülatif Hacim (hm³)",
+                xaxis_title="Tarih"
             )
 
             st.plotly_chart(fig, use_container_width=True)
 
         with col_harita:
-
             st.subheader("İstasyon Konumları")
 
             m = folium.Map(
@@ -322,24 +241,10 @@ if df is not None:
                 folium.Marker(
                     location=koordinat,
                     popup=f"<b>{ad} İstasyonu</b><br>Meteorolojik Girdi",
-                    icon=folium.Icon(color="darkblue", icon="info-sign")
+                    icon=folium.Icon(color="darkblue", icon="info-sign"),
                 ).add_to(m)
 
-            st_folium(m, width=450, height=500)
-
-        # ------------------------------------------------------------
-        # 4.8. ALT BİLGİ
-        # ------------------------------------------------------------
-
-        st.markdown("---")
-
-        st.caption(
-            "Not: 2150 hm³ kritik eşiği grafik üzerinde sabit yatay çizgi olarak gösterilmiştir. "
-            "2400 hm³ uyarı eşiği ise grafik üzerinde gösterilmemekte, yalnızca karar destek mekanizmasında kullanılmaktadır."
-        )
+            st_folium(m, width=400, height=350)
 
     else:
-        st.warning(
-            f"⚠️ {hedef_yil} yılına ait veri bulunamadı. "
-            "Lütfen CSV dosyasındaki tarih aralığını kontrol ediniz."
-        )
+        st.warning(f"⚠️ {hedef_yil} yılına ait veri bulunamadı.")
