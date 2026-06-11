@@ -16,20 +16,63 @@ UYARI_ESIK = 2400   # hm³
 @st.cache_data
 def load_data():
     dosya_yolu = "Tez_Veriler_5_Scenarios_with_99CI.csv"
+
     if os.path.exists(dosya_yolu):
         df = pd.read_csv(dosya_yolu, sep=None, engine='python')
-        df['Date'] = pd.to_datetime(df['Date'])
+
+        # Tarih dönüşümü
+        # Eğer tarih formatın gün/ay/yıl ise dayfirst=True daha doğru olur.
+        df['Date'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
+
+        df = df.dropna(subset=['Date'])
+        df = df.sort_values('Date')
+
         df['Year'] = df['Date'].dt.year
+        df['Month'] = df['Date'].dt.month
+
         return df
+
     else:
         st.error(f"⚠️ {dosya_yolu} bulunamadı! Lütfen KDS ile aynı klasörde olduğundan emin olun.")
         return None
+
+
+# 4. GRAFİK İÇİN AYLIK / YUMUŞATILMIŞ VERİ HAZIRLAMA
+def prepare_plot_data(df, secilen_sutun, hedef_yil):
+    df_plot = df[df['Year'] <= hedef_yil][['Date', secilen_sutun]].copy()
+    df_plot = df_plot.dropna(subset=['Date', secilen_sutun])
+    df_plot = df_plot.sort_values('Date')
+
+    # Aynı tarihe birden fazla kayıt varsa ortalamasını al
+    df_plot = df_plot.groupby('Date', as_index=False)[secilen_sutun].mean()
+
+    # Eğer veri seyrekse, örneğin sadece yıllık/Ocak değerleri varsa,
+    # aylık görünüme çevirmek için zaman bazlı interpolasyon yapılır.
+    tarih_sayisi = df_plot['Date'].nunique()
+    toplam_yil_sayisi = df_plot['Date'].dt.year.nunique()
+
+    sadece_yillik_gibi = tarih_sayisi <= toplam_yil_sayisi + 2
+
+    if sadece_yillik_gibi and tarih_sayisi > 1:
+        df_plot = df_plot.set_index('Date')
+
+        # Aylık başlangıç frekansına çek
+        df_plot = df_plot.resample('MS').interpolate(method='time')
+
+        df_plot = df_plot.reset_index()
+        grafik_notu = "Grafik, yıllık/Ocak değerlerinden aylık interpolasyonla yumuşatılmıştır."
+
+    else:
+        grafik_notu = "Grafik, veri setindeki mevcut tarihsel çözünürlük üzerinden çizilmiştir."
+
+    return df_plot, grafik_notu
+
 
 df = load_data()
 
 if df is not None:
 
-    # 4. YAN MENÜ TASARIMI
+    # 5. YAN MENÜ TASARIMI
     st.sidebar.image(
         "https://upload.wikimedia.org/wikipedia/commons/0/0b/Yedi_Renkli_G%C3%B6l_%E2%80%93_E%C4%9Firdir.jpg",
         use_container_width=True
@@ -38,7 +81,6 @@ if df is not None:
     st.sidebar.title("KONTROL PANELİ")
     st.sidebar.markdown("---")
 
-    # Senaryo Sözlüğü
     scenario_dict = {
         "Baseline (Geçmiş İklim Eğilimi)": "Volume_Cumulative_base",
         "CanESM5 SSP1-2.6 (İyimser)": "Volume_Cumulative_SSP1_26",
@@ -62,13 +104,12 @@ if df is not None:
     )
 
     st.sidebar.markdown("---")
-
     st.sidebar.info(
         "📌 **Bilgi:** Bu sistem, Random Forest makine öğrenmesi algoritması "
         "ve IPCC AR6 / MedECC MAR1 iklim standartları kullanılarak geliştirilmiştir."
     )
 
-    # 5. ANA EKRAN TASARIMI
+    # 6. ANA EKRAN TASARIMI
     st.title("🌊 Eğirdir Gölü Su Kaynakları Karar Destek Sistemi (KDS)")
     st.markdown(f"**Seçilen Yıl:** {hedef_yil} | **Aktif Senaryo:** {secilen_senaryo_adi}")
 
@@ -77,38 +118,33 @@ if df is not None:
 
     if not df_yil.empty:
 
-        # O yılın son ayındaki kümülatif durumu al
+        # O yılın son kaydındaki kümülatif durumu al
         son_deger = df_yil.iloc[-1]
-
         tahmin_hacim = son_deger[secilen_sutun]
-        alt_sinir = son_deger['Volume_Cumulative_Lower_99CI']
-        ust_sinir = son_deger['Volume_Cumulative_Upper_99CI']
 
-        # 6. RİSK DURUMU ANALİZİ
-        # Artık güven aralığına göre değil, sabit eşiklere göre çalışır.
-
+        # 7. RİSK DURUMU ANALİZİ
         if tahmin_hacim < KRITIK_ESIK:
             durum_mesaji = "🚨 KRİTİK SEVİYE"
             durum_aciklama = "Tahmini hacim 2150 hm³ kritik eşiğinin altına düşmüştür."
             renk = "inverse"
-            arka_plan_rengi = "#ffebee"   # açık kırmızı
+            arka_plan_rengi = "#ffebee"
             uyari_kutu_rengi = "#ffcdd2"
 
         elif tahmin_hacim < UYARI_ESIK:
             durum_mesaji = "⚠️ UYARI SEVİYESİ"
             durum_aciklama = "Tahmini hacim 2400 hm³ uyarı eşiğinin altına düşmüştür."
             renk = "off"
-            arka_plan_rengi = "#fff8e1"   # açık sarı
+            arka_plan_rengi = "#fff8e1"
             uyari_kutu_rengi = "#ffecb3"
 
         else:
             durum_mesaji = "✅ NORMAL SEVİYE"
             durum_aciklama = "Tahmini hacim uyarı ve kritik eşik değerlerinin üzerindedir."
             renk = "normal"
-            arka_plan_rengi = "#ffffff"   # normal beyaz
+            arka_plan_rengi = "#ffffff"
             uyari_kutu_rengi = "#e8f5e9"
 
-        # 7. SAYFA ARKA PLAN RENGİ
+        # 8. SAYFA RENKLENDİRME
         st.markdown(
             f"""
             <style>
@@ -126,12 +162,16 @@ if df is not None:
                 font-weight: 600;
                 border: 1px solid rgba(0,0,0,0.12);
             }}
+
+            iframe {{
+                width: 100% !important;
+            }}
             </style>
             """,
             unsafe_allow_html=True
         )
 
-        # 8. ÜST SKOR KARTLARI
+        # 9. ÜST SKOR KARTLARI
         col1, col2, col3 = st.columns(3)
 
         col1.metric(
@@ -164,17 +204,14 @@ if df is not None:
 
         st.markdown("---")
 
-        # 9. ALT BÖLÜM: GRAFİK VE HARİTA
+        # 10. ALT BÖLÜM: GRAFİK VE HARİTA
         col_grafik, col_harita = st.columns((2, 1))
 
         with col_grafik:
             st.subheader(f"Gelecek Projeksiyonu (2020 - {hedef_yil})")
 
-            # Seçilen yıla kadar olan tüm ayları alır.
-            # Eğer CSV aylık ise grafik aylık değerleri gösterir.
-            df_plot = df[df['Year'] <= hedef_yil].copy()
+            df_plot, grafik_notu = prepare_plot_data(df, secilen_sutun, hedef_yil)
 
-            # Plotly ile etkileşimli ve yumuşatılmış çizgi grafik
             fig = px.line(
                 df_plot,
                 x='Date',
@@ -191,16 +228,6 @@ if df is not None:
                 name="Tahmini Hacim",
                 showlegend=True,
                 line=dict(width=3)
-            )
-
-            # %99 Alt Sınır
-            fig.add_scatter(
-                x=df_plot['Date'],
-                y=df_plot['Volume_Cumulative_Lower_99CI'],
-                mode='lines',
-                name='%99 Alt Sınır',
-                line=dict(dash='dot', color='red'),
-                line_shape="spline"
             )
 
             # Kritik eşik çizgisi: 2150 hm³
@@ -221,6 +248,8 @@ if df is not None:
             )
 
             st.plotly_chart(fig, use_container_width=True)
+
+            st.caption(grafik_notu)
 
         with col_harita:
             st.subheader("İstasyon Konumları")
@@ -244,7 +273,11 @@ if df is not None:
                     icon=folium.Icon(color="darkblue", icon="info-sign"),
                 ).add_to(m)
 
-            st_folium(m, width=400, height=350)
+            st_folium(
+                m,
+                height=350,
+                use_container_width=True
+            )
 
     else:
         st.warning(f"⚠️ {hedef_yil} yılına ait veri bulunamadı.")
