@@ -219,7 +219,7 @@ if df is not None:
                 title=f"{secilen_senaryo_adi} Hacim Eğrisi",
                 labels={
                     'Date': 'Tarih',
-                    secilen_sutun: 'Kümülatif Hacim (hm³)'
+                    secilen_sutun: 'Hacim (hm³)'
                 },
                 line_shape="spline"
             )
@@ -240,10 +240,17 @@ if df is not None:
                 annotation_position="top left"
             )
 
+            max_y = max(df_plot[secilen_sutun].max(), KRITIK_ESIK)
+
+            fig.update_yaxes(
+                range=[0, max_y * 1.10],
+                title_text="Hacim (hm³)"
+            )
+
             fig.update_layout(
                 hovermode="x unified",
                 legend_title_text="Gösterge",
-                yaxis_title="Kümülatif Hacim (hm³)",
+                yaxis_title="Hacim (hm³)",
                 xaxis_title="Tarih"
             )
 
@@ -254,17 +261,20 @@ if df is not None:
         with col_harita:
             st.subheader("İstasyon Konumları")
 
-            m = folium.Map(
-                location=[38.0, 30.8],
-                zoom_start=9,
-                tiles="CartoDB positron"
-            )
-
             istasyonlar = {
                 "Eğirdir": [37.87, 30.85],
                 "Senirkent": [38.09, 30.55],
                 "Yalvaç": [38.30, 31.18]
             }
+
+            # Harita: konteyneri tamamen dolduracak şekilde
+            m = folium.Map(
+                location=[38.08, 30.86],
+                zoom_start=9,
+                tiles="CartoDB positron",
+                width="100%",
+                height="100%"
+            )
 
             for ad, koordinat in istasyonlar.items():
                 folium.Marker(
@@ -273,10 +283,15 @@ if df is not None:
                     icon=folium.Icon(color="darkblue", icon="info-sign"),
                 ).add_to(m)
 
+            # Üç istasyonun tamamını kapsayacak maksimum yakınlaştırma
+            bounds = list(istasyonlar.values())
+            m.fit_bounds(bounds, padding=(25, 25))
+
             st_folium(
                 m,
                 height=350,
-                use_container_width=True
+                use_container_width=True,
+                returned_objects=[]
             )
 
     else:
