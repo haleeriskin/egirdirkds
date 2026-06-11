@@ -97,7 +97,7 @@ if df is not None:
 
     hedef_yil = st.sidebar.slider(
         "📅 Hedef Yılı Seçiniz:",
-        min_value=2020,
+        min_value=2021,
         max_value=2050,
         value=2050,
         step=1
